@@ -1,0 +1,1 @@
+Folder scripts_survey_wifi/ kini juga berisi wlan_mac.py, WifiScanMac.app, dan kode sumbernya di mac_helper/. Mahasiswa yang memakai Mac sebaiknya membangun ulang aplikasi itu di laptop masing-masing lewat build_mac_helper.sh.
