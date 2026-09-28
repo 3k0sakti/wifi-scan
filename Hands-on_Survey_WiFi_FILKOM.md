@@ -6,7 +6,7 @@
 **Fokus:** Band **5 GHz** (band yang digunakan jaringan FILKOM saat ini)
 **Perangkat:** Laptop **Ubuntu/Linux**, **Windows**, atau **macOS** + ponsel Android
 **Lokasi:** Gedung F FILKOM, lantai 2–4 · **SSID yang dianalisis:** `WiFi-UB.x`
-**Status dokumen:** DRAFT v0.3
+**Status dokumen:** DRAFT v0.4
 
 ---
 
@@ -98,14 +98,11 @@ python3 -m venv ~/wifi                 # Ubuntu 24.04 menolak pip di luar venv (
 source ~/wifi/bin/activate             # ulangi di setiap terminal baru
 pip install pandas numpy scipy matplotlib
 
-iw dev                                 # nama interface, mis. wlan0 / wlp2s0 / wlp0s20f3
-iw list | grep -A 30 "Band 2"          # Band 2 = 5 GHz; pastikan ada frekuensi 5xxx MHz
 cd kelompok2_L3
-python scan_point.py --iface wlp0s20f3 --titik UJI --slot T0 --device laptopA \
-     --out uji.csv --n 1 --ssid "WiFi-UB.x"
+python cek_laptop.py                   # lihat §3.3b
 ```
 
-> **Jangan menjalankan skrip dengan `sudo`.** `iw scan` memang butuh hak root, tetapi `scan_point.py` sudah memanggil `sudo iw` sendiri, jadi password diminta sekali per ±15 menit. Kalau seluruh skrip dijalankan dengan `sudo`, file dan folder `data/` menjadi milik root, dan skrip lain (mis. `active_point.py`) gagal menulis ke sana. `python3-tk` diperlukan agar jendela klik `mark_points.py` bisa tampil.
+> **Jangan menjalankan skrip dengan `sudo`.** `iw scan` memang butuh hak root, tetapi `scan_point.py` sudah memanggil `sudo iw` sendiri, jadi password diminta sekali per ±15 menit. Kalau seluruh skrip dijalankan dengan `sudo`, file dan folder `data/` menjadi milik root, dan skrip lain (mis. `active_point.py`) gagal menulis ke sana. `python3-tk` diperlukan agar jendela klik `mark_points.py` bisa tampil. Nama interface Wi-Fi (di Ubuntu mis. `wlp2s0`, bukan `wlan0`) **dideteksi otomatis**. Opsi `--iface` hanya perlu diisi kalau laptop punya lebih dari satu adaptor Wi-Fi.
 
 ### 3.3a Instalasi: macOS (opsional)
 
@@ -117,9 +114,27 @@ pip install pandas numpy scipy matplotlib
 cd kelompok2_L3
 xcode-select --install                    # sekali, bila compiler swiftc belum ada
 sh mac_helper/build_mac_helper.sh         # membuat ulang WifiScanMac.app di laptop sendiri
-python scan_point.py --titik UJI --slot T0 --device macbook --out uji.csv --n 1 --ssid "WiFi-UB.x"
+python cek_laptop.py                        # scan pertama memunculkan dialog izin lokasi
 ```
 Pada scan pertama, klik **Allow** di dialog izin lokasi. Jika dialog tidak muncul, buka *System Settings → Privacy & Security → Location Services*, lalu aktifkan **WifiScanMac**. Di macOS, noise floor ikut terbaca, sehingga SNR bisa dihitung.
+
+### 3.3b Cek kesiapan laptop (wajib, semua OS)
+
+Dari folder kelompok, dalam keadaan tersambung ke `WiFi-UB.x`, jalankan:
+```bash
+python cek_laptop.py
+```
+Skrip ini memeriksa versi Python dan library, tkinter, `iw`/interface/dukungan 5 GHz/hak sudo (khusus Linux), **scan Wi-Fi sungguhan**, uji latensi ke `filkom.ub.ac.id`, dan `analyze.py` pada hasil scan tadi. Contoh hasil nyata dari ThinkPad Ubuntu 22.04 di lantai 3:
+```
+[LULUS] Library Python               pandas 2.2.3, numpy 2.1.3, scipy 1.14.1, matplotlib 3.9.2
+[GAGAL] tkinter (mark_points.py)     tkinter tidak ada -> ... sudo apt install python3-tk
+[LULUS] Interface Wi-Fi              wlp2s0
+[LULUS] Dukungan 5 GHz               Band 2 (5 GHz) didukung
+[LULUS] Scan Wi-Fi (scan_point.py)   18 BSSID (5 GHz: 8), WiFi-UB.x terkuat -49 dBm ch157
+[LULUS] Uji aktif (active_point.py)  RTT 38.77 ms, loss 2.0% (icmp)
+[LULUS] Analisis (analyze.py)        3 gambar dibuat
+```
+Laptop dinyatakan siap jika hasil akhirnya **`SEMUA LULUS`**. Perbaiki setiap baris GAGAL sesuai petunjuk yang tercetak (lihat juga §12).
 
 ### 3.4 Ponsel Android
 
@@ -190,7 +205,7 @@ Di FILKOM, **semua AP memancarkan SSID `WiFi-UB.x`**. Semua AP itu membentuk sat
 | `c0:c7:0a:98:3a:90` | eduroam |
 | `c0:c7:0a:98:3a:92` | FILKOM EVENT |
 
-Ketiganya adalah **satu radio fisik**. `analyze.py` otomatis menggabungkannya, dan radio tersebut diberi nama sesuai BSSID `WiFi-UB.x`-nya. Konsekuensinya untuk survei:
+Ketiganya adalah **satu radio fisik**. Hasil scan juga menunjukkan bahwa **ada radio yang hanya memancarkan eduroam dan FILKOM EVENT, tanpa WiFi-UB.x** (mis. di kanal 36 dan 40). Radio seperti ini tidak membantu pengguna WiFi-UB.x, meskipun tetap menambah beban kanal. `analyze.py` otomatis menggabungkannya, dan radio tersebut diberi nama sesuai BSSID `WiFi-UB.x`-nya. Konsekuensinya untuk survei:
 
 - **SSID tidak bisa dipakai untuk membedakan AP.** Setiap AP (tepatnya setiap radio) dikenali dari **BSSID**-nya (alamat MAC radio, mis. `a4:5e:60:xx:xx:xx`). Semua analisis di modul ini berbasis BSSID.
 - Nama SSID tidak menunjukkan lantai. Lantai asal sebuah AP harus **disimpulkan dari data**: AP terdengar paling kuat di lantai mana (§9.5).
@@ -247,6 +262,7 @@ Artinya, **NetSpot Free tidak dapat membuat peta kualitas sinyal**. Karena itu, 
 
 | Skrip | Fungsi |
 |---|---|
+| `cek_laptop.py` | Memeriksa kesiapan laptop dalam satu perintah (LULUS/GAGAL per langkah) |
 | `scan_point.py` | Passive scan di satu titik (3× scan) → `passive_L{n}.csv`. Dengan `--ssid`, RSSI terkuat SSID kampus langsung ditampilkan |
 | `wlan_win.py` / `wlan_mac.py` | Modul pendukung Windows / macOS (dipakai otomatis, tidak dijalankan langsung) |
 | `WifiScanMac.app`, `mac_helper/` | Aplikasi pembantu scan untuk macOS beserta kode sumber dan skrip build-nya |
@@ -277,7 +293,7 @@ Artinya, **NetSpot Free tidak dapat membuat peta kualitas sinyal**. Karena itu, 
 
 | Menit | Tahap | Kegiatan | Hasil |
 |---|---|---|---|
-| 0–15 | **Briefing** | Kumpulkan soal pendahuluan, cek laptop (uji scan), bagi peran dan zona | Semua laptop lulus uji scan |
+| 0–15 | **Briefing** | Kumpulkan soal pendahuluan, jalankan `cek_laptop.py` di semua laptop, bagi peran dan zona | Semua laptop `SEMUA LULUS` |
 | 15–45 | **Tahap 1: Sketsa denah** | Ukur dan buat sketsa denah di kertas, tandai AP fisik, tentukan dan beri nomor titik ukur (§8.1) | Sketsa bernomor + foto AP |
 | 45–55 | **Tahap 2: Kalibrasi** | Semua perangkat melakukan scan di titik `L{n}-000` (§8.2) | Offset perangkat |
 | 55–115 | **Tahap 3: Survei pasif** | Tim A dan B menyurvei semua titik di zonanya (§8.3) | `passive_L{n}_A/B.csv` + RSSI tertulis di sketsa |
@@ -338,8 +354,8 @@ Di titik `L{n}-000`, semua laptop melakukan 5 scan bersamaan, dan ponsel mencata
 python scan_point.py --titik L3-000 --lantai 3 --slot T1 --device laptopA --out data\passive_L3_A.csv --n 5 --ssid "WiFi-UB.x"
 ```
 ```bash
-# Ubuntu/Linux dan macOS (di Linux tambahkan --iface <nama interface>)
-python scan_point.py --iface wlp0s20f3 --titik L3-000 --lantai 3 --slot T1 \
+# Ubuntu/Linux dan macOS
+python scan_point.py --titik L3-000 --lantai 3 --slot T1 \
      --device laptopA --out data/passive_L3_A.csv --n 5 --ssid "WiFi-UB.x"
 ```
 
@@ -358,7 +374,7 @@ Di setiap titik:
    ```
    ```bash
    # Ubuntu/Linux dan macOS
-   python scan_point.py --iface wlp0s20f3 --titik L3-017 --lantai 3 --slot T1 \
+   python scan_point.py --titik L3-017 --lantai 3 --slot T1 \
         --device laptopA --out data/passive_L3_A.csv --ssid "WiFi-UB.x" --catatan "kelas kosong"
    ```
 3. **Tulis RSSI terkuat SSID kampus** yang tampil di layar ke sketsa, di samping nomor titik. Angka ini dipakai untuk memilih titik uji aktif (§8.4) dan membantu presentasi.
@@ -382,7 +398,7 @@ python active_point.py --titik L3-017 --out data\active_L3.csv
 ```
 ```bash
 # Ubuntu/Linux dan macOS
-python active_point.py --iface wlp0s20f3 --titik L3-017 --out data/active_L3.csv
+python active_point.py --titik L3-017 --out data/active_L3.csv
 ```
 
 > **Target latensi default adalah `filkom.ub.ac.id`** (server kampus). **Gateway jaringan UB tidak membalas ping**, karena ICMP diblokir. Ini sudah diuji langsung di lantai 3, jadi jangan memakai gateway sebagai target. Jika target sama sekali tidak membalas ping, skrip otomatis mengukur latensi dengan **koneksi TCP port 443**, dan metodenya dicatat di kolom `metode_rtt`. Throughput iperf3 bersifat **opsional**: tambahkan `--iperf <IP_SERVER>` hanya jika ada server iperf3.
@@ -396,7 +412,7 @@ ping -t filkom.ub.ac.id | ForEach-Object { "{0} {1}" -f (Get-Date -Format HH:mm:
 ```
 ```bash
 # Ubuntu/Linux dan macOS
-python roam_log.py --iface wlp0s20f3 --out raw/roaming_L3.csv                          # terminal 1
+python roam_log.py --out raw/roaming_L3.csv                          # terminal 1
 ping -i 0.2 filkom.ub.ac.id | while read l; do echo "$(date +%T) $l"; done | tee raw/roaming_ping_L3.txt   # terminal 2
 ```
 Tandai di sketsa lokasi saat log menampilkan **"PINDAH AP"**. Catat **sinyal sesaat sebelum pindah** dan **ping yang hilang** di sekitar waktu tersebut. Jika klien tetap menempel ke AP jauh sampai sinyal < −75 dBm, itu tanda **sticky client** atau kurangnya overlap antar-AP. Karena SSID-nya sama di semua lantai, perhatikan juga apakah klien **berpindah ke AP lantai lain**. Cocokkan BSSID di log dengan daftar AP per lantai hasil pleno (§9.5).
@@ -618,7 +634,7 @@ L{n}_titik.csv (ringkas), foto sketsa, foto AP fisik, log roaming, lembar kerja
 | Latensi `metode_rtt = tcp443` | Target tidak membalas ping, sehingga latensi diukur via TCP. Hasilnya tetap valid, cukup sebutkan di laporan |
 | Adaptor tidak mendukung 5 GHz | Beberapa adaptor USB murah hanya mendukung 2,4 GHz. Ganti laptop, atau pakai jalur darurat WiFiAnalyzer |
 | Hasil scan sedikit/tidak lengkap | Ulangi scan. Scan pasif pada kanal DFS lebih lambat, jadi 3 scan per titik penting |
-| Kolom `noise_dbm` kosong | Wajar di Windows dan pada sebagian driver Linux. Kriteria SNR dilewati |
+| Kolom `noise_dbm` kosong | Wajar di Windows dan pada sebagian driver Linux (mis. Intel `iwlwifi`, yang tidak mendukung `iw survey dump`). Kriteria SNR dilewati |
 | Kolom BSS Load kosong | AP tidak mengiklankan elemen BSS Load. Kriteria utilisasi dilewati |
 | iperf3 *connection refused/timeout* | Server tidak tersedia atau diblokir. iperf3 bersifat opsional, jadi cukup gunakan latensi/loss dan catat sebagai keterbatasan |
 | `PERINGATAN: titik tanpa koordinat` | Ada nomor titik di data yang belum diklik di `mark_points.py`. Lengkapi `titik_L{n}.csv` |
@@ -713,7 +729,7 @@ kelompok{k}_L{n}/
 ## Lampiran C. Checklist
 
 **Sebelum Pertemuan 1**
-- [ ] Python + library terpasang, `scan_point.py` lulus uji dan mendeteksi 5 GHz (min. 2 laptop)
+- [ ] `python cek_laptop.py` → **SEMUA LULUS** (min. 2 laptop)
 - [ ] Ubuntu: skrip dijalankan **tanpa** `sudo` (password diminta sendiri untuk `iw`); `python3-tk` terpasang
 - [ ] Windows 11: izin Location untuk desktop apps sudah aktif
 - [ ] macOS: WifiScanMac diizinkan di Location Services
@@ -740,7 +756,9 @@ kelompok{k}_L{n}/
 - *Hasil uji lapangan di Gedung F lantai 3 (28 Sep 2026, MacBook, dekat hall lift): SSID `WiFi-UB.x` 5 GHz −46 s.d. −51 dBm di kanal 157 (lebar 20 MHz), noise −89 s.d. −97 dBm, **utilisasi kanal ±80% dengan ±50 klien** pada satu radio, dan RTT ke filkom.ub.ac.id rata-rata ±320 ms (jitter ±195 ms). Kanal 5 GHz yang terlihat: 149, 153, 157, 161, semuanya 20 MHz. Gateway (10.200.224.1 / 10.201.64.1) tidak membalas ICMP.*
 - *Status pengujian skrip:*
   - *Uji nyata di FILKOM (macOS 26.3): scan pasif 3×, penggabungan radio multi-SSID (WiFi-UB.x/eduroam/FILKOM EVENT), uji aktif (ICMP ke filkom.ub.ac.id, dan TCP saat ICMP diblokir), serta analyze.py pada data nyata. Semua berjalan.*
+  - *Uji nyata di Ubuntu 22.04 (ThinkPad X1, Intel `iwlwifi`, `iw` 5.16, Python 3.10) di lantai 3: `cek_laptop.py` lulus kecuali tkinter (paket `python3-tk` belum terpasang; terdeteksi dengan benar), serta alur lengkap scan 3× tanpa koordinat → uji aktif → roam_log → analyze `--titik`. Interface `wlp2s0` terdeteksi otomatis, `sudo` hanya dipakai untuk `iw`, semua file milik user, dan parsing `iw` asli benar (lebar 20/40/80 MHz, BSS Load, keamanan, PMF). Bug yang ditemukan dan sudah diperbaiki: SSID dari `iw` berisi escape (`Michelle\x20`, `\xe9\x92\xb1`), dan default interface `wlan0` tidak cocok untuk Ubuntu.*
+  - *RTT ke filkom.ub.ac.id sangat bervariasi pada jam yang sama (39 ms s.d. 1.262 ms), yang menandakan jaringan padat. Minta mahasiswa membahasnya dan mengulang uji aktif bila perlu.*
   - *Jalur Ubuntu diuji end-to-end 3 lantai dengan `iw`/`sudo`/`ping`/`iperf3` tiruan melalui subprocess sungguhan (Python 3.10 = Ubuntu 22.04, dan Python 3.8): mark_points (klik tersimulasi) → scan tanpa koordinat → gabung A/B → uji aktif → analyze → gabung_lantai. `sudo` hanya dipanggil untuk `iw scan`, file data tetap milik user, dan pesan error `iw` (busy/No such device/Network is down) teruji. Posisi AP meleset < 1,3 m, lantai asal AP benar semua, dan floor bleed terdeteksi 20,2 dB (model 20 dB).*
   - *16 kasus sulit analyze.py lulus di pandas 1.4 dan 2.3; pyflakes bersih.*
   - *Jalur Windows diuji dengan tiruan wlanapi.dll (layout memori Windows x64).*
-  - *Belum diuji di perangkat sungguhan: Ubuntu dengan `iw` asli dan Windows. **Jalankan langkah uji §3.2/§3.3 di 1 laptop Ubuntu dan 1 laptop Windows sebelum Pertemuan 1** (±5 menit).*
+  - *Belum diuji di perangkat sungguhan: Windows. **Jalankan `python cek_laptop.py` di 1 laptop Windows sebelum Pertemuan 1** (±2 menit).*
