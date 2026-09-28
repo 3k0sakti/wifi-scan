@@ -4,7 +4,8 @@
 **Bentuk:** Praktikum lapangan berkelompok, **2 pertemuan (3 SKS)**. Minggu ini eksperimen, minggu depan presentasi.
 **Kelompok:** 3 kelompok. **Kelompok 1 → Lantai 2**, **Kelompok 2 → Lantai 3**, **Kelompok 3 → Lantai 4**
 **Fokus:** Band **5 GHz** (band yang digunakan jaringan FILKOM saat ini)
-**Perangkat:** Laptop **Windows** atau **Linux** + ponsel Android
+**Perangkat:** Laptop **Ubuntu/Linux**, **Windows**, atau **macOS** + ponsel Android
+**Lokasi:** Gedung F FILKOM, lantai 2–4 · **SSID yang dianalisis:** `WiFi-UB.x`
 **Status dokumen:** DRAFT v0.3
 
 ---
@@ -57,7 +58,7 @@ Satu orang boleh memegang lebih dari satu peran jika anggota kelompok sedikit.
 | **Analis data** | 1–2 | Backup dan pengecekan kelengkapan data | Menjalankan `analyze.py` dan interpretasi |
 | **Penulis / presenter** | 1–2 | Mencatat kondisi lapangan | Menyusun laporan dan slide, presentasi |
 
-> **Zona A/B:** lantai dibagi dua, misalnya sayap kiri dan sayap kanan dari tangga utama, supaya dua tim bisa survei secara paralel.
+> **Zona A/B:** lantai dibagi dua supaya dua tim bisa survei secara paralel. Gunakan sumbu grid pada peta evakuasi Gedung F: **Zona A = sumbu F sampai D** (sisi lift/toilet), **Zona B = sumbu D sampai A**.
 
 ---
 
@@ -65,7 +66,7 @@ Satu orang boleh memegang lebih dari satu peran jika anggota kelompok sedikit.
 
 ### 3.1 Perangkat per kelompok
 
-- **Minimal 2 laptop** (satu per tim zona) dengan Wi-Fi yang mendukung **5 GHz**. Laptop boleh **Windows 10/11** atau **Linux** (termasuk Ubuntu Live USB).
+- **Minimal 2 laptop** (satu per tim zona) dengan Wi-Fi yang mendukung **5 GHz**. Laptop boleh **Ubuntu 22.04/24.04** (termasuk Ubuntu Live USB), **Windows 10/11**, atau **macOS 13+**.
 - **Minimal 2 ponsel Android** dengan aplikasi **WiFiAnalyzer**. iPhone tidak bisa dipakai karena iOS tidak mengizinkan aplikasi melakukan scan Wi-Fi.
 - Meteran atau laser distance meter (bila ada), papan jalan, kertas A3/milimeter blok, dan pensil.
 - Buat folder kelompok `kelompok{k}_L{n}/` di setiap laptop, lalu **salin seluruh isi `scripts_survey_wifi/` ke dalamnya**, beserta subfolder `data/`, `denah/`, `raw/`, dan `output/` (Lampiran A). **Semua perintah di modul ini dijalankan dari folder kelompok tersebut.**
@@ -82,7 +83,7 @@ Satu orang boleh memegang lebih dari satu peran jika anggota kelompok sedikit.
 5. Uji scan (tanpa perlu hak admin):
    ```bat
    cd kelompok1_L2
-   python scan_point.py --titik UJI --slot T0 --device laptopA --out uji.csv --n 1 --ssid "<SSID_KAMPUS>"
+   python scan_point.py --titik UJI --slot T0 --device laptopA --out uji.csv --n 1 --ssid "WiFi-UB.x"
    ```
    Keluaran yang benar menampilkan jumlah BSSID, termasuk yang 5 GHz, beserta RSSI SSID kampus dalam **dBm**.
 
@@ -92,16 +93,33 @@ Satu orang boleh memegang lebih dari satu peran jika anggota kelompok sedikit.
 
 ```bash
 sudo apt update
-sudo apt install -y iw iperf3 python3-pip python3-venv
-python3 -m venv ~/wifi && source ~/wifi/bin/activate
+sudo apt install -y iw iperf3 python3-pip python3-venv python3-tk
+python3 -m venv ~/wifi                 # Ubuntu 24.04 menolak pip di luar venv (PEP 668)
+source ~/wifi/bin/activate             # ulangi di setiap terminal baru
 pip install pandas numpy scipy matplotlib
 
-iw dev                                 # nama interface, mis. wlan0 / wlp2s0
+iw dev                                 # nama interface, mis. wlan0 / wlp2s0 / wlp0s20f3
 iw list | grep -A 30 "Band 2"          # Band 2 = 5 GHz; pastikan ada frekuensi 5xxx MHz
 cd kelompok2_L3
-sudo ~/wifi/bin/python scan_point.py --iface wlan0 --titik UJI --slot T0 --device laptopA \
-     --out uji.csv --n 1 --ssid "<SSID_KAMPUS>"
+python scan_point.py --iface wlp0s20f3 --titik UJI --slot T0 --device laptopA \
+     --out uji.csv --n 1 --ssid "WiFi-UB.x"
 ```
+
+> **Jangan menjalankan skrip dengan `sudo`.** `iw scan` memang butuh hak root, tetapi `scan_point.py` sudah memanggil `sudo iw` sendiri, jadi password diminta sekali per ±15 menit. Kalau seluruh skrip dijalankan dengan `sudo`, file dan folder `data/` menjadi milik root, dan skrip lain (mis. `active_point.py`) gagal menulis ke sana. `python3-tk` diperlukan agar jendela klik `mark_points.py` bisa tampil.
+
+### 3.3a Instalasi: macOS (opsional)
+
+macOS hanya memberikan SSID/BSSID kepada aplikasi yang diizinkan mengakses **Location Services**. Karena itu, scan di macOS dilakukan oleh aplikasi pembantu kecil, **`WifiScanMac.app`**, yang ada di folder skrip.
+
+```bash
+python3 -m venv ~/wifi && source ~/wifi/bin/activate
+pip install pandas numpy scipy matplotlib
+cd kelompok2_L3
+xcode-select --install                    # sekali, bila compiler swiftc belum ada
+sh mac_helper/build_mac_helper.sh         # membuat ulang WifiScanMac.app di laptop sendiri
+python scan_point.py --titik UJI --slot T0 --device macbook --out uji.csv --n 1 --ssid "WiFi-UB.x"
+```
+Pada scan pertama, klik **Allow** di dialog izin lokasi. Jika dialog tidak muncul, buka *System Settings → Privacy & Security → Location Services*, lalu aktifkan **WifiScanMac**. Di macOS, noise floor ikut terbaca, sehingga SNR bisa dihitung.
 
 ### 3.4 Ponsel Android
 
@@ -118,9 +136,6 @@ Pasang **WiFiAnalyzer** (VREM Software, open source, tersedia di F-Droid/Play St
 
 ### 3.6 Persiapan oleh dosen/asisten
 
-- Izin survei dari pimpinan fakultas dan unit TIK FILKOM, serta surat tugas.
-- Informasi **SSID resmi yang dianalisis**, **IP gateway/target ping**, dan (bila tersedia) **server iperf3 berkabel**.
-- Penetapan **titik acuan (0,0)** yang sama untuk ketiga lantai (mis. sudut tangga/lift utama) dan batas zona A/B setiap lantai.
 - Folder bersama (Google Drive) untuk data ketiga kelompok.
 
 ---
@@ -167,7 +182,15 @@ Artinya, dengan **80 MHz**, sinyal −70 dBm hanya mendukung MCS rendah. Lebar k
 
 ### 4.4 Satu SSID untuk seluruh gedung: identitas AP = BSSID
 
-Di FILKOM, **semua AP memancarkan SSID yang sama**. Semua AP itu membentuk satu jaringan (satu *ESS*), dan klien bebas berpindah (roaming) dari satu AP ke AP lain, **termasuk ke AP di lantai lain**. Konsekuensinya untuk survei:
+Di FILKOM, **semua AP memancarkan SSID `WiFi-UB.x`**. Semua AP itu membentuk satu jaringan (satu *ESS*), dan klien bebas berpindah (roaming) dari satu AP ke AP lain, **termasuk ke AP di lantai lain**. Setiap radio AP juga memancarkan SSID lain dengan BSSID yang berdekatan, misalnya (hasil scan nyata di lantai 3):
+
+| BSSID | SSID |
+|---|---|
+| `c0:c7:0a:98:3a:91` | WiFi-UB.x |
+| `c0:c7:0a:98:3a:90` | eduroam |
+| `c0:c7:0a:98:3a:92` | FILKOM EVENT |
+
+Ketiganya adalah **satu radio fisik**. `analyze.py` otomatis menggabungkannya, dan radio tersebut diberi nama sesuai BSSID `WiFi-UB.x`-nya. Konsekuensinya untuk survei:
 
 - **SSID tidak bisa dipakai untuk membedakan AP.** Setiap AP (tepatnya setiap radio) dikenali dari **BSSID**-nya (alamat MAC radio, mis. `a4:5e:60:xx:xx:xx`). Semua analisis di modul ini berbasis BSSID.
 - Nama SSID tidak menunjukkan lantai. Lantai asal sebuah AP harus **disimpulkan dari data**: AP terdengar paling kuat di lantai mana (§9.5).
@@ -181,7 +204,7 @@ Di FILKOM, **semua AP memancarkan SSID yang sama**. Semua AP itu membentuk satu 
 | RSSI AP terkuat (SSID kampus) | ≥ −67 dBm | −70 s.d. −67 | −80 s.d. −70 | < −80 atau tidak terdeteksi (**blank spot**) |
 | AP cadangan (terkuat ke-2) | ≥ −75 dBm | < −75 (roaming berisiko) | | |
 | Co-channel interference (radio lain di kanal overlap, ≥ −85 dBm) | ≤ 2 | > 2 | | |
-| SNR (jika noise tersedia, Linux) | ≥ 25 dB | 15–25 | < 15 | |
+| SNR (jika noise tersedia: Linux/macOS) | ≥ 25 dB | 15–25 | < 15 | |
 | Utilisasi kanal (BSS Load) | ≤ 50% | > 50% | | |
 | Throughput downlink (uji aktif) | | | < 10 Mbps | |
 | Packet loss / RTT (uji aktif) | | RTT > 50 ms | loss > 2% | |
@@ -211,28 +234,29 @@ Artinya, **NetSpot Free tidak dapat membuat peta kualitas sinyal**. Karena itu, 
 
 ### 5.2 Toolchain
 
-| Fungsi | Windows | Linux | Lisensi |
-|---|---|---|---|
-| Menggambar denah | draw.io (diagrams.net), Inkscape | sama | Apache-2.0 / GPL |
-| Scan AP 5 GHz | `scan_point.py` (Native Wi-Fi API) | `scan_point.py` (`iw`) | skrip modul |
-| Validasi silang | WiFiAnalyzer (Android); NetSpot Free (opsional) | WiFiAnalyzer | GPL-3.0 / freeware |
-| Uji aktif | `active_point.py` + `ping` (+ `iperf3`) | sama | skrip modul / BSD |
-| Log roaming | `roam_log.py` | sama | skrip modul |
-| Analisis dan peta | Python + `analyze.py`, `gabung_lantai.py` | sama | skrip modul |
+| Fungsi | Ubuntu/Linux | Windows | macOS | Lisensi |
+|---|---|---|---|---|
+| Menggambar denah | draw.io (diagrams.net), Inkscape | sama | sama | Apache-2.0 / GPL |
+| Scan AP 5 GHz | `scan_point.py` (`iw`) | `scan_point.py` (Native Wi-Fi API) | `scan_point.py` (WifiScanMac.app) | skrip modul |
+| Validasi silang | WiFiAnalyzer (Android) | sama; NetSpot Free (opsional) | sama | GPL-3.0 / freeware |
+| Uji aktif | `active_point.py` + `ping` (+ `iperf3`) | sama | sama | skrip modul / BSD |
+| Log roaming | `roam_log.py` | sama | sama | skrip modul |
+| Analisis dan peta | Python + `analyze.py`, `gabung_lantai.py` | sama | sama | skrip modul |
 
 **Isi folder `scripts_survey_wifi/`:**
 
 | Skrip | Fungsi |
 |---|---|
 | `scan_point.py` | Passive scan di satu titik (3× scan) → `passive_L{n}.csv`. Dengan `--ssid`, RSSI terkuat SSID kampus langsung ditampilkan |
-| `wlan_win.py` | Modul pendukung untuk Windows (dipakai otomatis, tidak dijalankan langsung) |
-| `active_point.py` | Info link, ping, dan iperf3 di satu titik → `active_L{n}.csv` |
+| `wlan_win.py` / `wlan_mac.py` | Modul pendukung Windows / macOS (dipakai otomatis, tidak dijalankan langsung) |
+| `WifiScanMac.app`, `mac_helper/` | Aplikasi pembantu scan untuk macOS beserta kode sumber dan skrip build-nya |
+| `active_point.py` | Info link, latensi/jitter/loss ke `filkom.ub.ac.id`, dan (opsional) iperf3 di satu titik → `active_L{n}.csv` |
 | `roam_log.py` | Mencatat BSSID dan sinyal setiap detik selama uji roaming |
 | `mark_points.py` | Kalibrasi skala denah digital dan penandaan titik ukur dengan klik → `titik_L{n}.csv` |
 | `analyze.py` | Satu perintah → heatmap, peta status, area lemah, estimasi posisi AP, distribusi kanal, ringkasan |
 | `gabung_lantai.py` | Menggabungkan tiga lantai: lantai asal AP dan *floor bleed* |
 
-**Perbedaan data Windows dan Linux:** Windows tidak menyediakan *noise floor*, jadi kolom SNR kosong dan kriteria SNR dilewati. Semua metrik lain tetap sama. Kelompok wajib menyebutkan OS dan model kartu Wi-Fi yang dipakai di laporan.
+**Perbedaan data antar-OS:** Windows tidak menyediakan *noise floor*, jadi kolom SNR kosong dan kriteria SNR dilewati. Linux (bergantung driver) dan macOS menyediakan noise. Semua metrik lain sama. Kelompok wajib menyebutkan OS dan model kartu Wi-Fi yang dipakai di laporan.
 
 ---
 
@@ -242,8 +266,8 @@ Artinya, **NetSpot Free tidak dapat membuat peta kualitas sinyal**. Karena itu, 
 2. **DILARANG:** deauthentication/jamming, membuat rogue AP/evil twin, cracking, menangkap payload lalu lintas pengguna lain, dan flooding. **Pelanggaran = nilai 0 untuk seluruh kelompok** dan dapat diproses sesuai peraturan akademik.
 3. iperf3 maksimal **8 detik per arah per titik**. Jangan menjalankan iperf3 bersamaan dengan kelompok lain pada AP yang sama.
 4. Jangan membuka plafon atau menyentuh perangkat jaringan. Cukup observasi visual dan foto.
-5. Masuk ke ruang kelas/lab hanya jika ruangan tidak dipakai atau sudah ada izin. Jangan menghalangi jalur evakuasi.
-6. Bawa surat tugas dan jelaskan kegiatan dengan sopan bila ditanya.
+5. Masuk ke ruang kelas hanya jika ruangan tidak sedang dipakai kuliah. Jangan menghalangi jalur evakuasi.
+6. Jelaskan kegiatan dengan sopan bila ditanya.
 
 ---
 
@@ -284,16 +308,23 @@ Artinya, **NetSpot Free tidak dapat membuat peta kualitas sinyal**. Karena itu, 
 
 ### 8.1 Tahap 1: Sketsa denah dan titik ukur
 
+**Acuan: peta jalur evakuasi Gedung F** yang terpasang di setiap lantai. Foto peta itu, tetapi **tetap gambar denah sendiri** dan ukur ulang di lapangan. Hal-hal yang terbaca dari peta lantai 3:
+- Ukuran lantai **36 × 36 m**, dengan grid kolom **7,2 m**: sumbu **A–F** (arah horizontal) dan **1–6** (arah vertikal).
+- **Garis jalur evakuasi = koridor.** Koridor berbentuk **cincin** yang mengelilingi blok ruang di tengah, dengan **persimpangan (junction) di keempat sudutnya**.
+- **Kotak-kotak = ruang kelas**, yaitu blok tengah (±6 kelas) serta deretan kelas di sisi atas dan bawah denah.
+- Lift, toilet, dan tangga ada di sisi sumbu F. Tangga lain ada di dekat sumbu C–B (atas dan bawah). Hall terbuka ada di sisi sumbu F dan sumbu A–B.
+- **Perhatikan mata angin:** pada peta evakuasi, **Utara ada di bawah** gambar. Pakai **nama sumbu grid** (mis. "koridor sumbu 5 antara E–D"), jangan kiri/kanan.
+
 **Sketsa (di kertas A3/milimeter blok, pensil):**
 - Gambar dinding luar, koridor, ruang (tulis nomor/nama ruang), pintu, tangga, lift, dan toilet.
 - **Ukur dan tulis angka dimensi** pada sketsa: panjang dan lebar koridor serta lebar setiap ruang. Gunakan meteran/laser, atau **hitung ubin lantai** (ukur satu ubin, mis. 60 × 60 cm), atau langkah kaki yang sudah dikalibrasi.
-- Tandai **titik acuan (0,0)** yang ditetapkan asisten dan panah arah utara.
+- Tandai **titik acuan (0,0) = perpotongan sumbu F dan 6** (sudut gedung di sisi toilet) dan panah arah utara. Titik ini sama di ketiga lantai.
 - Beri keterangan material dinding penting: beton, bata, kaca, partisi gipsum, pintu/lemari logam.
 - Tandai **setiap AP yang terlihat** (plafon/dinding) dengan ■ dan kode `AP-L{n}-01`, `AP-L{n}-02`, …, lalu **foto** setiap AP. Jika label atau model AP terbaca dari bawah, catat juga.
 
 **Titik ukur (target 25–35 titik per lantai), gambar di sketsa dan beri nomor `L{n}-001`, `L{n}-002`, …:**
-- Koridor: 1 titik setiap **± 5 m**.
-- Setiap ruang yang bisa diakses: minimal **1 titik di tengah**. Ruang besar: tambah 1 titik di **pojok terjauh dari AP**.
+- Koridor cincin: 1 titik setiap **± 5 m**, **ditambah 1 titik di setiap persimpangan/sudut koridor**, karena di sudut sinyal sering terhalang dinding dari dua arah.
+- Setiap **ruang kelas** yang bisa diakses: minimal **1 titik di tengah**. Kelas besar: tambah 1 titik di **pojok terjauh dari AP**. Titik di dalam kelas penting karena mahasiswa memakai Wi-Fi di kelas, bukan di koridor.
 - Area khusus: tangga, depan lift, lounge mahasiswa, ujung koridor, dan dekat jendela/balkon.
 - 1 **titik kalibrasi** `L{n}-000` di area terbuka dekat AP.
 - **Foto sketsa** setelah selesai dan unggah ke folder bersama. Foto ini menjadi acuan digitalisasi.
@@ -304,12 +335,12 @@ Di titik `L{n}-000`, semua laptop melakukan 5 scan bersamaan, dan ponsel mencata
 
 ```bat
 :: Windows
-python scan_point.py --titik L3-000 --lantai 3 --slot T1 --device laptopA --out data\passive_L3_A.csv --n 5 --ssid "<SSID_KAMPUS>"
+python scan_point.py --titik L3-000 --lantai 3 --slot T1 --device laptopA --out data\passive_L3_A.csv --n 5 --ssid "WiFi-UB.x"
 ```
 ```bash
-# Linux
-sudo ~/wifi/bin/python scan_point.py --iface wlan0 --titik L3-000 --lantai 3 --slot T1 \
-     --device laptopA --out data/passive_L3_A.csv --n 5 --ssid "<SSID_KAMPUS>"
+# Ubuntu/Linux dan macOS (di Linux tambahkan --iface <nama interface>)
+python scan_point.py --iface wlp0s20f3 --titik L3-000 --lantai 3 --slot T1 \
+     --device laptopA --out data/passive_L3_A.csv --n 5 --ssid "WiFi-UB.x"
 ```
 
 Catat selisih RSSI antar-perangkat untuk AP yang sama (**offset perangkat**) di Lembar Kerja. Offset ini dibahas di laporan dan **tidak** dipakai untuk mengoreksi data secara otomatis.
@@ -323,19 +354,19 @@ Di setiap titik:
 2. Jalankan (3 scan, ± 20–25 detik):
    ```bat
    :: Windows
-   python scan_point.py --titik L3-017 --lantai 3 --slot T1 --device laptopA --out data\passive_L3_A.csv --ssid "<SSID_KAMPUS>" --catatan "kelas kosong, pintu tertutup"
+   python scan_point.py --titik L3-017 --lantai 3 --slot T1 --device laptopA --out data\passive_L3_A.csv --ssid "WiFi-UB.x" --catatan "kelas kosong, pintu tertutup"
    ```
    ```bash
-   # Linux
-   sudo ~/wifi/bin/python scan_point.py --iface wlan0 --titik L3-017 --lantai 3 --slot T1 \
-        --device laptopA --out data/passive_L3_A.csv --ssid "<SSID_KAMPUS>" --catatan "kelas kosong"
+   # Ubuntu/Linux dan macOS
+   python scan_point.py --iface wlp0s20f3 --titik L3-017 --lantai 3 --slot T1 \
+        --device laptopA --out data/passive_L3_A.csv --ssid "WiFi-UB.x" --catatan "kelas kosong"
    ```
 3. **Tulis RSSI terkuat SSID kampus** yang tampil di layar ke sketsa, di samping nomor titik. Angka ini dipakai untuk memilih titik uji aktif (§8.4) dan membantu presentasi.
 4. Secara bersamaan, anggota lain mengambil screenshot **WiFiAnalyzer** (tab *Access Points*, filter 5 GHz) dengan nama file `L3-017.png`.
 5. Isi Lembar Kerja: centang titik, perkiraan jumlah orang, dan pintu terbuka/tertutup.
 6. Pindah ke titik berikutnya. Target: ± 2 menit per titik.
 
-**Jalur darurat (jika laptop bermasalah):** catat manual dari WiFiAnalyzer ke CSV dengan kolom `titik_id,ssid,bssid,channel,rssi_dbm`, **satu baris untuk setiap BSSID 5 GHz yang terlihat** (bukan hanya yang terkuat). Karena SSID-nya sama semua, BSSID adalah satu-satunya pembeda AP. `analyze.py` tetap bisa memprosesnya.
+**Jalur darurat (jika laptop bermasalah):** catat manual dari WiFiAnalyzer ke CSV dengan kolom `titik_id,ssid,bssid,channel,rssi_dbm`, **satu baris untuk setiap BSSID 5 GHz yang terlihat** (bukan hanya yang terkuat). Karena SSID-nya sama di semua AP, BSSID adalah satu-satunya pembeda AP. Catat juga baris eduroam/FILKOM EVENT bila terlihat. `analyze.py` tetap bisa memprosesnya.
 
 ### 8.4 Tahap 4: Survei aktif dan roaming
 
@@ -344,28 +375,29 @@ Di setiap titik:
 - 2 titik dengan **RSSI terbaik** (pembanding),
 - 1–3 titik yang **RSSI-nya bagus tetapi dicurigai**, misalnya area padat mahasiswa atau banyak AP terdengar.
 
-Hubungkan laptop ke **SSID kampus**, lalu di setiap titik jalankan:
+Hubungkan laptop ke **`WiFi-UB.x`**, lalu di setiap titik jalankan:
 ```bat
-:: Windows (target = IP gateway; lihat "Default Gateway" pada perintah ipconfig)
-python active_point.py --titik L3-017 --target <IP_GATEWAY> --out data\active_L3.csv [--iperf <IP_SERVER>]
+:: Windows
+python active_point.py --titik L3-017 --out data\active_L3.csv
 ```
 ```bash
-# Linux (ip route | grep default -> IP gateway)
-~/wifi/bin/python active_point.py --iface wlan0 --titik L3-017 --target <IP_GATEWAY> \
-     --out data/active_L3.csv [--iperf <IP_SERVER>]
+# Ubuntu/Linux dan macOS
+python active_point.py --iface wlp0s20f3 --titik L3-017 --out data/active_L3.csv
 ```
+
+> **Target latensi default adalah `filkom.ub.ac.id`** (server kampus). **Gateway jaringan UB tidak membalas ping**, karena ICMP diblokir. Ini sudah diuji langsung di lantai 3, jadi jangan memakai gateway sebagai target. Jika target sama sekali tidak membalas ping, skrip otomatis mengukur latensi dengan **koneksi TCP port 443**, dan metodenya dicatat di kolom `metode_rtt`. Throughput iperf3 bersifat **opsional**: tambahkan `--iperf <IP_SERVER>` hanya jika ada server iperf3.
 
 **Uji roaming (1 lintasan koridor, ± 5 menit):** berjalan pelan dari ujung ke ujung koridor sambil menjalankan dua terminal:
 ```bat
 :: Terminal 1 (Windows) - BSSID dan sinyal setiap detik
 python roam_log.py --out raw\roaming_L3.csv
 :: Terminal 2 (PowerShell) - ping dengan cap waktu
-ping -t <IP_GATEWAY> | ForEach-Object { "{0} {1}" -f (Get-Date -Format HH:mm:ss), $_ } | Tee-Object raw\roaming_ping_L3.txt
+ping -t filkom.ub.ac.id | ForEach-Object { "{0} {1}" -f (Get-Date -Format HH:mm:ss), $_ } | Tee-Object raw\roaming_ping_L3.txt
 ```
 ```bash
-# Linux
-python3 roam_log.py --iface wlan0 --out raw/roaming_L3.csv                          # terminal 1
-ping -i 0.2 <IP_GATEWAY> | while read l; do echo "$(date +%T) $l"; done | tee raw/roaming_ping_L3.txt   # terminal 2
+# Ubuntu/Linux dan macOS
+python roam_log.py --iface wlp0s20f3 --out raw/roaming_L3.csv                          # terminal 1
+ping -i 0.2 filkom.ub.ac.id | while read l; do echo "$(date +%T) $l"; done | tee raw/roaming_ping_L3.txt   # terminal 2
 ```
 Tandai di sketsa lokasi saat log menampilkan **"PINDAH AP"**. Catat **sinyal sesaat sebelum pindah** dan **ping yang hilang** di sekitar waktu tersebut. Jika klien tetap menempel ke AP jauh sampai sinyal < −75 dBm, itu tanda **sticky client** atau kurangnya overlap antar-AP. Karena SSID-nya sama di semua lantai, perhatikan juga apakah klien **berpindah ke AP lantai lain**. Cocokkan BSSID di log dengan daftar AP per lantai hasil pleno (§9.5).
 
@@ -395,8 +427,8 @@ Import-Csv data\passive_L3_A.csv, data\passive_L3_B.csv -Encoding UTF8 | Export-
 | Aturan | Ketentuan |
 |---|---|
 | Skala | **1 meter = 20 piksel**. Di draw.io, aktifkan grid 20 px, sehingga 1 kotak = 1 m |
-| Titik acuan (0,0) | Diletakkan pada koordinat piksel **yang sama di ketiga denah**, mis. (100, 100), supaya ketiga lantai bisa ditumpuk |
-| Ukuran kanvas | **Sama** untuk ketiga lantai (disepakati ketiga kelompok) |
+| Titik acuan (0,0) | **Perpotongan sumbu F dan 6** diletakkan di piksel **(100, 100)** pada ketiga denah, supaya ketiga lantai bisa ditumpuk |
+| Ukuran kanvas | **920 × 920 px** untuk ketiga lantai (36 m × 20 px = 720 px, ditambah margin 100 px di setiap sisi) |
 | Isi | Dinding, ruang + nomor, pintu, tangga, lift, toilet, material penting, AP fisik (■ + kode), panah utara |
 | Ekspor | `denah_L{n}.png` tanpa margin + file sumber `.drawio`/`.svg` |
 
@@ -413,7 +445,7 @@ AP-L3-01,340,180,plafon koridor depan R.3.x
 ### 9.2 Menjalankan analisis
 
 ```bash
-python analyze.py --passive data/passive_L3.csv --titik data/titik_L3.csv --ssid "<SSID_KAMPUS>" \
+python analyze.py --passive data/passive_L3.csv --titik data/titik_L3.csv --ssid "WiFi-UB.x" \
        --denah denah/denah_L3.png --scale 20 --out output/L3 \
        --active data/active_L3.csv --ap-fisik data/ap_fisik_L3.csv
 ```
@@ -431,9 +463,9 @@ python analyze.py --passive data/passive_L3.csv --titik data/titik_L3.csv --ssid
 Contoh keluaran dari **data sintetis** (bukan data FILKOM) ada di `scripts_survey_wifi/contoh_output/`.
 
 > **Keterbatasan yang wajib disadari:**
-> (a) Interpolasi heatmap hanya valid **di dalam** sebaran titik ukur. Jika semua titik berada pada satu garis (mis. hanya koridor), skrip otomatis beralih ke interpolasi IDW dengan radius 5 m dari setiap titik, dan metodenya tercantum di judul heatmap.
+> (a) Interpolasi heatmap hanya diisi sampai **6 m dari titik ukur terdekat**. Contohnya, blok kelas di tengah koridor cincin tidak akan "dikarang" nilainya jika tidak ada titik di dalamnya. Jika semua titik berada pada satu garis, skrip otomatis beralih ke IDW (radius 5 m). Metode yang dipakai tercantum di judul heatmap.
 > (b) Estimasi posisi AP adalah **perkiraan**. Keyakinan "sedang" (△) berarti AP kemungkinan tembus dari lantai atas/bawah atau berada di ruang tertutup. Keyakinan "rendah" tidak digambar, tetapi tetap tercantum di `L{n}_ap.csv`. Konfirmasi lantai asal AP saat pleno (`gabung_lantai.py`).
-> (c) Setiap BSSID dihitung sebagai satu radio. BSSID yang hanya beda digit terakhir **baru digabung jika memancarkan SSID berbeda** (satu radio, multi-SSID). Dengan SSID yang sama di seluruh FILKOM, BSSID praktis tidak digabung, jadi AP ber-MAC berurutan tetap terhitung terpisah. Jika penggabungan terjadi, skrip menampilkan baris `Info:`.
+> (c) BSSID digabung menjadi satu radio hanya jika **kanalnya sama, SSID-nya berbeda, MAC-nya hanya beda 1 oktet, dan RSSI-nya hampir identik** (median selisih ≤ 4 dB) di titik yang sama. Contohnya WiFi-UB.x, eduroam, dan FILKOM EVENT dari satu AP. BSSID ber-SSID sama tidak pernah digabung, sehingga dua AP WiFi-UB.x ber-MAC berurutan tetap terhitung terpisah. Skrip menampilkan baris `Info:` saat penggabungan terjadi.
 > (d) Survei dilakukan pada satu rentang waktu. Kondisi beban pada jam lain bisa berbeda.
 
 ### 9.3 Langkah interpretasi
@@ -576,13 +608,19 @@ L{n}_titik.csv (ringkas), foto sketsa, foto AP fisik, log roaming, lembar kerja
 | **Windows:** `akses ditolak ... Location` | Aktifkan *Settings → Privacy & security → Location* dan "Let desktop apps access your location", lalu ulangi |
 | **Windows:** `'python' is not recognized` | Instal ulang Python dengan mencentang "Add python.exe to PATH", atau pakai `py` sebagai pengganti `python` |
 | **Windows:** tidak ada BSSID 5 GHz | Cek *Device Manager → Network adapters → Properties → Advanced*, pastikan band 5 GHz tidak dinonaktifkan ("Preferred Band"/"Wireless Mode") |
-| **Linux:** `iw scan` → *Operation not permitted* | Jalankan dengan `sudo` |
-| **Linux:** `iw scan` → *Device or resource busy* | Tunggu beberapa detik lalu ulangi. Jika tetap gagal: `sudo nmcli radio wifi off && sudo nmcli radio wifi on` |
+| **Ubuntu:** `iw scan gagal: No such device` | Nama interface salah. Lihat dengan `iw dev` (mis. `wlp0s20f3`), lalu isi `--iface` |
+| **Ubuntu:** `iw scan gagal: Network is down` | Wi-Fi mati: `nmcli radio wifi on` |
+| **Ubuntu:** `Permission denied` saat menulis `data/...` | Folder pernah dibuat oleh `sudo python ...`. Perbaiki dengan `sudo chown -R $USER data raw output`, lalu jalankan skrip **tanpa** `sudo` |
+| **Ubuntu:** *Device or resource busy* | Skrip otomatis mencoba ulang. Jika tetap gagal: `nmcli radio wifi off && nmcli radio wifi on` |
+| **Ubuntu:** jendela `mark_points.py` tidak muncul | `sudo apt install python3-tk`, lalu buat ulang venv |
+| **macOS:** `WifiScanMac: izin lokasi ditolak` / tidak ada data | *System Settings → Privacy & Security → Location Services →* aktifkan **WifiScanMac** |
+| **macOS:** `WifiScanMac.app belum ada` | `sh mac_helper/build_mac_helper.sh` (butuh `xcode-select --install`) |
+| Latensi `metode_rtt = tcp443` | Target tidak membalas ping, sehingga latensi diukur via TCP. Hasilnya tetap valid, cukup sebutkan di laporan |
 | Adaptor tidak mendukung 5 GHz | Beberapa adaptor USB murah hanya mendukung 2,4 GHz. Ganti laptop, atau pakai jalur darurat WiFiAnalyzer |
 | Hasil scan sedikit/tidak lengkap | Ulangi scan. Scan pasif pada kanal DFS lebih lambat, jadi 3 scan per titik penting |
 | Kolom `noise_dbm` kosong | Wajar di Windows dan pada sebagian driver Linux. Kriteria SNR dilewati |
 | Kolom BSS Load kosong | AP tidak mengiklankan elemen BSS Load. Kriteria utilisasi dilewati |
-| iperf3 *connection refused/timeout* | Server tidak tersedia atau diblokir. Cukup gunakan ping, lalu catat sebagai keterbatasan |
+| iperf3 *connection refused/timeout* | Server tidak tersedia atau diblokir. iperf3 bersifat opsional, jadi cukup gunakan latensi/loss dan catat sebagai keterbatasan |
 | `PERINGATAN: titik tanpa koordinat` | Ada nomor titik di data yang belum diklik di `mark_points.py`. Lengkapi `titik_L{n}.csv` |
 | `ERROR: SSID '...' tidak ditemukan` | Nama SSID salah ketik (huruf besar/kecil berpengaruh). Skrip menampilkan daftar SSID yang terdeteksi; salin nama yang tepat |
 | `ERROR: tidak ada data band 5 GHz` | Laptop hanya menangkap 2,4 GHz. Periksa dukungan 5 GHz pada adaptor (lihat baris di atas) |
@@ -640,7 +678,7 @@ kelompok{k}_L{n}/
 (`x_px`/`y_px` boleh kosong saat survei, karena diisi dari `titik_L{n}.csv` saat analisis.)
 
 **Kolom `active_L{n}.csv`** (dihasilkan `active_point.py`):
-`timestamp, titik_id, bssid_assoc, freq_mhz, rssi_dbm, tx_rate_mbps, rtt_avg_ms, rtt_max_ms, jitter_ms, loss_pct, down_mbps, up_mbps`
+`timestamp, titik_id, bssid_assoc, freq_mhz, rssi_dbm, tx_rate_mbps, rtt_avg_ms, rtt_max_ms, jitter_ms, loss_pct, down_mbps, up_mbps, metode_rtt`
 
 ## Lampiran B. Lembar Kerja Lapangan (cetak)
 
@@ -676,7 +714,9 @@ kelompok{k}_L{n}/
 
 **Sebelum Pertemuan 1**
 - [ ] Python + library terpasang, `scan_point.py` lulus uji dan mendeteksi 5 GHz (min. 2 laptop)
+- [ ] Ubuntu: skrip dijalankan **tanpa** `sudo` (password diminta sendiri untuk `iw`); `python3-tk` terpasang
 - [ ] Windows 11: izin Location untuk desktop apps sudah aktif
+- [ ] macOS: WifiScanMac diizinkan di Location Services
 - [ ] WiFiAnalyzer terpasang, scan throttling dimatikan
 - [ ] Soal pendahuluan selesai
 
@@ -688,7 +728,7 @@ kelompok{k}_L{n}/
 - [ ] Data tim A + B digabung dan diunggah
 
 **Selama seminggu**
-- [ ] `denah_L{n}.png` (20 px/m, titik acuan sesuai kesepakatan)
+- [ ] `denah_L{n}.png` (20 px/m, kanvas 920 × 920 px, sumbu F/6 di piksel (100, 100))
 - [ ] `titik_L{n}.csv` (nomor sama dengan sketsa) + `ap_fisik_L{n}.csv`
 - [ ] `analyze.py` dijalankan, tidak ada peringatan titik tanpa koordinat
 - [ ] Laporan + slide + `L{n}_ap.csv` + `L{n}_ringkasan.txt` diunggah H-1
@@ -696,12 +736,11 @@ kelompok{k}_L{n}/
 ---
 
 *Catatan untuk dosen/asisten (hapus sebelum dibagikan):*
-- *Isi: SSID resmi yang dianalisis, IP gateway/target ping, server iperf3 (jika ada), titik acuan (0,0) untuk lantai 2–4, ukuran kanvas denah bersama, dan batas zona A/B setiap lantai.*
-- *Urus izin dan koordinasi dengan unit TIK FILKOM sebelum Pertemuan 1. Sebaiknya survei dilakukan pada jam kuliah normal agar kondisi beban realistis.*
 - *Siapkan folder bersama untuk data ketiga kelompok, dan jalankan `gabung_lantai.py` sebelum Pertemuan 2.*
+- *Hasil uji lapangan di Gedung F lantai 3 (28 Sep 2026, MacBook, dekat hall lift): SSID `WiFi-UB.x` 5 GHz −46 s.d. −51 dBm di kanal 157 (lebar 20 MHz), noise −89 s.d. −97 dBm, **utilisasi kanal ±80% dengan ±50 klien** pada satu radio, dan RTT ke filkom.ub.ac.id rata-rata ±320 ms (jitter ±195 ms). Kanal 5 GHz yang terlihat: 149, 153, 157, 161, semuanya 20 MHz. Gateway (10.200.224.1 / 10.201.64.1) tidak membalas ICMP.*
 - *Status pengujian skrip:*
-  - *Lulus di Python 3.8 (pandas 1.4) dan Python 3.10 (pandas 2.3, numpy 2.2, scipy 1.15, matplotlib 3.10); pyflakes bersih.*
-  - *Uji end-to-end 3 lantai dengan `iw`/`ping`/`iperf3` tiruan: mark_points (klik tersimulasi) → scan tanpa koordinat → gabung A/B → uji aktif → analyze → gabung_lantai. Posisi AP terestimasi meleset < 1,3 m, lantai asal AP benar semua, dan floor bleed terdeteksi 20,2 dB (model 20 dB).*
-  - *16 kasus sulit analyze.py lulus (titik segaris koridor, 1–2 titik, SSID salah/hilang, hanya 2,4 GHz, SSID emoji/koma, data manual minimal, koordinat kosong, dll.).*
-  - *Jalur Windows diuji dengan tiruan wlanapi.dll yang menulis struktur ke memori sesuai layout Windows x64: scan, info link, ping Windows berbahasa Indonesia, log roaming, dan pesan saat izin Location ditolak.*
-  - *Belum diuji: Windows dan `iw` sungguhan, serta jendela GUI `mark_points.py`. **Coba di 1 laptop Windows dan 1 laptop Linux sebelum Pertemuan 1** (cukup langkah uji §3.2/§3.3).*
+  - *Uji nyata di FILKOM (macOS 26.3): scan pasif 3×, penggabungan radio multi-SSID (WiFi-UB.x/eduroam/FILKOM EVENT), uji aktif (ICMP ke filkom.ub.ac.id, dan TCP saat ICMP diblokir), serta analyze.py pada data nyata. Semua berjalan.*
+  - *Jalur Ubuntu diuji end-to-end 3 lantai dengan `iw`/`sudo`/`ping`/`iperf3` tiruan melalui subprocess sungguhan (Python 3.10 = Ubuntu 22.04, dan Python 3.8): mark_points (klik tersimulasi) → scan tanpa koordinat → gabung A/B → uji aktif → analyze → gabung_lantai. `sudo` hanya dipanggil untuk `iw scan`, file data tetap milik user, dan pesan error `iw` (busy/No such device/Network is down) teruji. Posisi AP meleset < 1,3 m, lantai asal AP benar semua, dan floor bleed terdeteksi 20,2 dB (model 20 dB).*
+  - *16 kasus sulit analyze.py lulus di pandas 1.4 dan 2.3; pyflakes bersih.*
+  - *Jalur Windows diuji dengan tiruan wlanapi.dll (layout memori Windows x64).*
+  - *Belum diuji di perangkat sungguhan: Ubuntu dengan `iw` asli dan Windows. **Jalankan langkah uji §3.2/§3.3 di 1 laptop Ubuntu dan 1 laptop Windows sebelum Pertemuan 1** (±5 menit).*
